@@ -1,5 +1,6 @@
 name: Build Zed Latest Release
 on:
+  workflow_dispatch:
   schedule:
     - cron: "0 0 * * *" # Runs every night at midnight UTC
   push:
