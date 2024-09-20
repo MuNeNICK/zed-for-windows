@@ -42,6 +42,7 @@ jobs:
           else
             echo "Proceeding with build for Zed's latest tag: ${{ steps.get_latest_tag.outputs.latest_tag }}"
             echo "proceed=true" >> $GITHUB_OUTPUT
+          fi
 
   build:
     needs: check
