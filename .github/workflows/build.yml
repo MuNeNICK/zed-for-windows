@@ -29,7 +29,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          releases=$(gh release list -R vrichv/zed-win -L 10 --json tagName,isLatest -q '.[] | select(.isLatest == true) | select(.tagName | startswith("v")) | .tagName')
+          releases=$(gh release list -R munenick/zed-for-windows -L 10 --json tagName,isLatest -q '.[] | select(.isLatest == true) | select(.tagName | startswith("v")) | .tagName')
           echo "Our latest release: $releases"
           echo "OUR_LATEST_RELEASE=$releases" >> $GITHUB_ENV
 
@@ -84,7 +84,7 @@ jobs:
           path: target/release/zed.exe
 
   create_installer:
-    needs: build
+    needs: [check, build]
     runs-on: windows-latest
     if: needs.check.outputs.proceed == 'true'
 
@@ -98,49 +98,23 @@ jobs:
           name: zed-release
           path: zed-release
 
-      - name: Install NSIS
+      - name: Update Inno Setup script version
         run: |
-          choco install nsis -y
+          $content = Get-Content -Path zed_setup.iss -Raw
+          $newContent = $content -replace '#define MyAppVersion ".*"', '#define MyAppVersion "${{ needs.check.outputs.latest_tag }}"'
+          $newContent | Set-Content -Path zed_setup.iss -NoNewline
 
-      - name: Create NSIS script dynamically
-        run: |
-          echo 'Name "Zed Installer"' > installer.nsi
-          echo 'OutFile "ZedInstaller-${{ needs.check.outputs.latest_tag }}.exe"' >> installer.nsi
-          echo 'InstallDir "$PROGRAMFILES\\Zed"' >> installer.nsi
-          echo 'Page directory' >> installer.nsi
-          echo 'Page instfiles' >> installer.nsi
-          echo 'Section "MainSection" SEC01' >> installer.nsi
-          echo '  SetOutPath "$INSTDIR"' >> installer.nsi
-          echo '  File "zed-release\\zed.exe"' >> installer.nsi
-          echo '  WriteUninstaller "$INSTDIR\\uninstall.exe"' >> installer.nsi
-          
-          # Create Start Menu Shortcut
-          echo '  CreateShortCut "$SMPROGRAMS\\Zed.lnk" "$INSTDIR\\zed.exe"' >> installer.nsi
-          # Create Desktop Shortcut
-          echo '  CreateShortCut "$DESKTOP\\Zed.lnk" "$INSTDIR\\zed.exe"' >> installer.nsi
-          
-          # Add Explorer "Zed" Open Option
-          echo '  WriteRegStr HKCR "Directory\\shell\\Zed" "" "Open with Zed"' >> installer.nsi
-          echo '  WriteRegStr HKCR "Directory\\shell\\Zed\\command" "" "$INSTDIR\\zed.exe %1"' >> installer.nsi
+      - name: Compile Setup Wizard
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: zed_setup.iss
+          options: /O+
 
-          echo 'SectionEnd' >> installer.nsi
-          
-          echo 'Section "Uninstall"' >> installer.nsi
-          echo '  Delete "$INSTDIR\\zed.exe"' >> installer.nsi
-          echo '  Delete "$INSTDIR\\uninstall.exe"' >> installer.nsi
-          echo '  RMDir "$INSTDIR"' >> installer.nsi
-          echo '  DeleteRegKey HKCR "Directory\\shell\\Zed"' >> installer.nsi
-          echo 'SectionEnd' >> installer.nsi
-
-      - name: Build NSIS Installer
-        run: |
-          makensis installer.nsi
-
-      - name: Archive NSIS Installer
+      - name: Upload Inno Setup Installer
         uses: actions/upload-artifact@v4
         with:
           name: zed-installer
-          path: ZedInstaller-${{ needs.check.outputs.latest_tag }}.exe
+          path: Output/ZedInstaller-${{ needs.check.outputs.latest_tag }}.exe
 
   release:
     needs: [check, build, create_installer]
@@ -150,7 +124,7 @@ jobs:
     if: needs.check.outputs.proceed == 'true'
 
     steps:
-      - name: Download NSIS Installer
+      - name: Download Inno Setup Installer
         uses: actions/download-artifact@v4
         with:
           name: zed-installer
@@ -165,7 +139,7 @@ jobs:
       - name: Zip the non-installer executable
         run: zip zed-${{ needs.check.outputs.latest_tag }}.zip zed-release/zed.exe
 
-      - name: Upload both release artifacts to GitHub Release
+      - name: Upload release artifacts to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ needs.check.outputs.latest_tag }}
@@ -173,5 +147,5 @@ jobs:
           draft: false
           make_latest: true
           files: |
-            ZedInstaller-${{ needs.check.outputs.latest_tag }}.exe
+            zed-installer/ZedInstaller-${{ needs.check.outputs.latest_tag }}.exe
             zed-${{ needs.check.outputs.latest_tag }}.zip
