@@ -8,8 +8,28 @@ on:
         type: string
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version_exists: ${{ steps.check_tag.outputs.exists }}
+    steps:
+      - name: Check if version exists
+        id: check_tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view ${{ github.event.inputs.zed_version }} --repo zed-industries/zed &> /dev/null; then
+            echo "Version ${{ github.event.inputs.zed_version }} exists."
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Version ${{ github.event.inputs.zed_version }} does not exist."
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
   build:
+    needs: check_version
     runs-on: windows-latest
+    if: needs.check_version.outputs.version_exists == 'true'
     steps:
       - name: Checkout Zed repository
         uses: actions/checkout@v3
