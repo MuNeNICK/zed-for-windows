@@ -42,7 +42,6 @@ jobs:
           else
             echo "Proceeding with build for Zed's latest tag: ${{ steps.get_latest_tag.outputs.latest_tag }}"
             echo "proceed=true" >> $GITHUB_OUTPUT
-          fi
 
   build:
     needs: check
@@ -83,28 +82,100 @@ jobs:
           name: zed-release
           path: target/release/zed.exe
 
+      - name: Zip non-installer release
+        run: |
+          zip zed-${{ needs.check.outputs.latest_tag }}.zip target/release/zed.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: zed-zip
+          path: zed-${{ needs.check.outputs.latest_tag }}.zip
+
+  create_installer:
+    needs: build
+    runs-on: windows-latest
+    if: needs.check.outputs.proceed == 'true'
+
+    steps:
+      - name: Checkout our repository
+        uses: actions/checkout@v3
+
+      - name: Download Zed build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: zed-release
+          path: zed-release
+
+      - name: Install NSIS
+        run: |
+          choco install nsis -y
+
+      - name: Create NSIS script dynamically
+        run: |
+          echo 'Name "Zed Installer"' > installer.nsi
+          echo 'OutFile "ZedInstaller-${{ needs.check.outputs.latest_tag }}.exe"' >> installer.nsi
+          echo 'InstallDir "$PROGRAMFILES\\Zed"' >> installer.nsi
+          echo 'Page directory' >> installer.nsi
+          echo 'Page instfiles' >> installer.nsi
+          echo 'Section "MainSection" SEC01' >> installer.nsi
+          echo '  SetOutPath "$INSTDIR"' >> installer.nsi
+          echo '  File "zed-release\\zed.exe"' >> installer.nsi
+          echo '  WriteUninstaller "$INSTDIR\\uninstall.exe"' >> installer.nsi
+
+          # Create Start Menu Shortcut
+          echo '  CreateShortCut "$SMPROGRAMS\\Zed.lnk" "$INSTDIR\\zed.exe"' >> installer.nsi
+          # Create Desktop Shortcut
+          echo '  CreateShortCut "$DESKTOP\\Zed.lnk" "$INSTDIR\\zed.exe"' >> installer.nsi
+          
+          # Add Explorer "Zed" Open Option
+          echo '  WriteRegStr HKCR "Directory\\shell\\Zed" "" "Open with Zed"' >> installer.nsi
+          echo '  WriteRegStr HKCR "Directory\\shell\\Zed\\command" "" "$INSTDIR\\zed.exe %1"' >> installer.nsi
+
+          echo 'SectionEnd' >> installer.nsi
+          
+          echo 'Section "Uninstall"' >> installer.nsi
+          echo '  Delete "$INSTDIR\\zed.exe"' >> installer.nsi
+          echo '  Delete "$INSTDIR\\uninstall.exe"' >> installer.nsi
+          echo '  RMDir "$INSTDIR"' >> installer.nsi
+          echo '  DeleteRegKey HKCR "Directory\\shell\\Zed"' >> installer.nsi
+          echo 'SectionEnd' >> installer.nsi
+
+      - name: Build NSIS Installer
+        run: |
+          makensis installer.nsi
+
+      - name: Archive NSIS Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: zed-installer
+          path: ZedInstaller-${{ needs.check.outputs.latest_tag }}.exe
+
   release:
-    needs: [check, build]
+    needs: [check, build, create_installer]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     if: needs.check.outputs.proceed == 'true'
 
     steps:
-      - name: Download release artifact
+      - name: Download NSIS Installer
         uses: actions/download-artifact@v4
         with:
-          name: zed-release
-          path: zed-release
+          name: zed-installer
+          path: zed-installer
 
-      - name: Zip the release artifact
-        run: zip -r zed-windows.zip zed-release/*
+      - name: Download non-installer zip
+        uses: actions/download-artifact@v4
+        with:
+          name: zed-zip
+          path: zed-zip
 
-      - name: Upload release build artifact to GitHub Release
+      - name: Upload both release artifacts to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ needs.check.outputs.latest_tag }}
           tag_name: ${{ needs.check.outputs.latest_tag }}
           draft: false
           make_latest: true
-          files: zed-windows.zip
+          files: |
+            ZedInstaller-${{ needs.check.outputs.latest_tag }}.exe
+            zed-${{ needs.check.outputs.latest_tag }}.zip
