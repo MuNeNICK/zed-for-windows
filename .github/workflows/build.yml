@@ -83,8 +83,9 @@ jobs:
           path: target/release/zed.exe
 
       - name: Zip non-installer release
-        run: |
-          zip zed-${{ needs.check.outputs.latest_tag }}.zip target/release/zed.exe
+        run: zip zed-${{ needs.check.outputs.latest_tag }}.zip target/release/zed.exe
+
+      - name: Upload non-installer release
         uses: actions/upload-artifact@v4
         with:
           name: zed-zip
@@ -120,7 +121,7 @@ jobs:
           echo '  SetOutPath "$INSTDIR"' >> installer.nsi
           echo '  File "zed-release\\zed.exe"' >> installer.nsi
           echo '  WriteUninstaller "$INSTDIR\\uninstall.exe"' >> installer.nsi
-
+          
           # Create Start Menu Shortcut
           echo '  CreateShortCut "$SMPROGRAMS\\Zed.lnk" "$INSTDIR\\zed.exe"' >> installer.nsi
           # Create Desktop Shortcut
