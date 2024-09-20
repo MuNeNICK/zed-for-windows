@@ -3,7 +3,7 @@
 Only release versions are included, and pre-release versions may not be included.
 
 nightly builds:
-https://github.com/deevus/zed-windows-builds/releases
+[https://github.com/MuNeNICK/zed-for-windows/releases](https://github.com/MuNeNICK/zed-for-windows/releases)
 
 ## Is it safe?
 
