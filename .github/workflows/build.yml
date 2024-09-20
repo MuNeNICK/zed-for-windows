@@ -36,7 +36,7 @@ jobs:
       - name: Compare releases
         id: compare
         run: |
-          if [ -z "${{ steps.get_latest_tag.outputs.latest_tag  }}" ] ||  [ "${{ env.OUR_LATEST_RELEASE }}" = "${{ steps.get_latest_tag.outputs.latest_tag }}" ]; then
+          if [ -z "${{ steps.get_latest_tag.outputs.latest_tag }}" ] || [ "${{ env.OUR_LATEST_RELEASE }}" = "${{ steps.get_latest_tag.outputs.latest_tag }}" ]; then
             echo "Our latest release matches Zed's latest tag. Stopping workflow."
             echo "proceed=false" >> $GITHUB_OUTPUT
           else
@@ -82,15 +82,6 @@ jobs:
         with:
           name: zed-release
           path: target/release/zed.exe
-
-      - name: Zip non-installer release
-        run: zip zed-${{ needs.check.outputs.latest_tag }}.zip target/release/zed.exe
-
-      - name: Upload non-installer release
-        uses: actions/upload-artifact@v4
-        with:
-          name: zed-zip
-          path: zed-${{ needs.check.outputs.latest_tag }}.zip
 
   create_installer:
     needs: build
@@ -165,11 +156,14 @@ jobs:
           name: zed-installer
           path: zed-installer
 
-      - name: Download non-installer zip
+      - name: Download non-installer executable
         uses: actions/download-artifact@v4
         with:
-          name: zed-zip
-          path: zed-zip
+          name: zed-release
+          path: zed-release
+
+      - name: Zip the non-installer executable
+        run: zip zed-${{ needs.check.outputs.latest_tag }}.zip zed-release/zed.exe
 
       - name: Upload both release artifacts to GitHub Release
         uses: softprops/action-gh-release@v2
