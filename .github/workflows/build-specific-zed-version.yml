@@ -1,0 +1,68 @@
+name: Build Specific Zed Version
+on:
+  workflow_dispatch:
+    inputs:
+      zed_version:
+        description: 'Zed version to build (e.g., v0.100.0)'
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Zed repository
+        uses: actions/checkout@v3
+        with:
+          repository: zed-industries/zed
+          ref: ${{ github.event.inputs.zed_version }}
+          fetch-depth: 1
+
+      - name: Set up for build
+        run: |
+          echo "Ready to build ${{ github.event.inputs.zed_version }}"
+
+      - name: Install rust nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          target: wasm32-wasi
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2.7.3
+
+      - name: Build release
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+      - name: Archive build
+        uses: actions/upload-artifact@v4
+        with:
+          name: zed-release
+          path: target/release/zed.exe
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: zed-release
+          path: zed-release
+
+      - name: Zip the release artifact
+        run: zip -r zed-windows.zip zed-release/*
+
+      - name: Upload release build artifact to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.event.inputs.zed_version }}
+          tag_name: ${{ github.event.inputs.zed_version }}
+          draft: false
+          files: zed-windows.zip
