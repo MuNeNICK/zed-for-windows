@@ -4,6 +4,8 @@
 #define MyAppExeName "zed.exe"
 
 [Setup]
+; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
+; Generate a new GUID for your application using the command [guid]::NewGuid() in PowerShell or an online GUID generator.
 AppId={{DEC54CF2-B010-495E-A78B-BD7E1DED610A}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
@@ -14,12 +16,16 @@ OutputBaseFilename=ZedInstaller-{#MyAppVersion}
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
+UninstallDisplayIcon={app}\{#MyAppExeName}
+ChangesAssociations=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked; OnlyBelowVersion: 6.1; Check: not IsAdminInstallMode
+Name: "associatefiles"; Description: "Associate Zed with all file types"; GroupDescription: "File associations:"; Flags: unchecked
 
 [Files]
 Source: "zed-release\zed.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -27,82 +33,47 @@ Source: "zed-release\zed.exe"; DestDir: "{app}"; Flags: ignoreversion
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon
 
 [Registry]
-Root: HKCR; Subkey: "Directory\shell\{#MyAppName}"; ValueType: string; ValueName: ""; ValueData: "Open with {#MyAppName}"
-Root: HKCR; Subkey: "Directory\shell\{#MyAppName}\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
+Root: HKCR; Subkey: "*\shell\{#MyAppName}"; ValueType: string; ValueName: ""; ValueData: "Open with {#MyAppName}"; Flags: uninsdeletekey
+Root: HKCR; Subkey: "*\shell\{#MyAppName}\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Flags: uninsdeletekey
+Root: HKCR; Subkey: "Applications\{#MyAppExeName}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Flags: uninsdeletekey
 
 [Code]
-var
-  InstallationPage: TInputDirWizardPage;
-  ShortcutsPage: TInputOptionWizardPage;
-  AdditionalSettingsPage: TInputOptionWizardPage;
-
-procedure InitializeWizard;
-begin
-  // Installation directory page
-  InstallationPage := CreateInputDirPage(wpSelectDir,
-    'Select Installation Directory', 'Where should Zed be installed?',
-    'Select the folder in which to install Zed, then click Next.',
-    False, '');
-  InstallationPage.Add('');
-  InstallationPage.Values[0] := ExpandConstant('{autopf}\{#MyAppName}');
-
-  // Shortcuts page
-  ShortcutsPage := CreateInputOptionPage(InstallationPage.ID,
-    'Shortcut Options', 'Where would you like shortcuts to be created?',
-    'Select the locations for shortcuts, then click Next.',
-    False, False);
-  ShortcutsPage.Add('Create a desktop shortcut');
-  ShortcutsPage.Add('Create a Quick Launch shortcut');
-
-  // Additional settings page
-  AdditionalSettingsPage := CreateInputOptionPage(ShortcutsPage.ID,
-    'Additional Settings', 'Configure additional options',
-    'Select any additional settings you would like to apply, then click Next.',
-    False, False);
-  AdditionalSettingsPage.Add('Add Zed to system PATH');
-  AdditionalSettingsPage.Add('Associate .txt files with Zed');
-end;
-
-function NextButtonClick(CurPageID: Integer): Boolean;
-begin
-  if CurPageID = InstallationPage.ID then
-    WizardForm.DirEdit.Text := InstallationPage.Values[0];
-  
-  Result := True;
-end;
-
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  Path: string;
+  ResultCode: Integer;
 begin
   if CurStep = ssPostInstall then
   begin
-    if AdditionalSettingsPage.Values[0] then
+    if WizardIsTaskSelected('associatefiles') then
     begin
-      // Add to PATH
-      Path := ExpandConstant('{app}');
-      if not RegQueryStringValue(HKEY_LOCAL_MACHINE,
-        'SYSTEM\CurrentControlSet\Control\Session Manager\Environment',
-        'Path', Path) then
-        Path := '';
-      if Pos(';' + UpperCase(ExpandConstant('{app}')) + ';', ';' + UpperCase(Path) + ';') = 0 then
-      begin
-        Path := Path + ';' + ExpandConstant('{app}');
-        RegWriteStringValue(HKEY_LOCAL_MACHINE,
-          'SYSTEM\CurrentControlSet\Control\Session Manager\Environment',
-          'Path', Path);
-      end;
+      // Associate Zed with all file types
+      Exec(ExpandConstant('{sys}\ftype.exe'), '.=ZedFile', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      Exec(ExpandConstant('{sys}\assoc.exe'), '.=ZedFile', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     end;
+  end;
+end;
 
-    if AdditionalSettingsPage.Values[1] then
-    begin
-      // Associate .txt files
-      RegWriteStringValue(HKCR, '.txt\OpenWithProgids', 'ZedFile', '');
-      RegWriteStringValue(HKCR, 'ZedFile', '', 'Zed Text File');
-      RegWriteStringValue(HKCR, 'ZedFile\DefaultIcon', '', ExpandConstant('{app}\{#MyAppExeName},0'));
-      RegWriteStringValue(HKCR, 'ZedFile\shell\open\command', '', '"' + ExpandConstant('{app}\{#MyAppExeName}') + '" "%1"');
-    end;
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ResultCode: Integer;
+begin
+  if CurUninstallStep = usPostUninstall then
+  begin
+    // Remove desktop icon
+    DeleteFile(ExpandConstant('{userdesktop}\{#MyAppName}.lnk'));
+    
+    // Remove Quick Launch icon
+    DeleteFile(ExpandConstant('{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}.lnk'));
+    
+    // Remove file associations
+    Exec(ExpandConstant('{sys}\ftype.exe'), 'ZedFile=', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec(ExpandConstant('{sys}\assoc.exe'), '.=', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    
+    // Clean up registry
+    RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\{#MyAppName}');
+    RegDeleteKeyIncludingSubkeys(HKCR, 'Applications\{#MyAppExeName}');
   end;
 end;
