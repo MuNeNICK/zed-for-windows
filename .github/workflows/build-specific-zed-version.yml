@@ -27,7 +27,7 @@ jobs:
           fi
 
   build:
-    needs: check_version
+    needs: check
     runs-on: windows-latest
     if: needs.check_version.outputs.version_exists == 'true'
     steps:
@@ -65,7 +65,7 @@ jobs:
           path: target/release/zed.exe
 
   create_installer:
-    needs: build
+    needs: [check, build]
     runs-on: windows-latest
 
     steps:
@@ -97,7 +97,7 @@ jobs:
           path: Output/ZedInstaller-${{ github.event.inputs.zed_version }}.exe
 
   release:
-    needs: [build, create_installer]
+    needs: [check, build, create_installer]
     runs-on: ubuntu-latest
     permissions:
       contents: write
