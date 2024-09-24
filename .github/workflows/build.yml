@@ -29,9 +29,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          releases=$(gh release list -R munenick/zed-for-windows -L 10 --json tagName,isLatest -q '.[] | select(.isLatest == true) | select(.tagName | startswith("v")) | .tagName')
-          echo "Our latest release: $releases"
-          echo "OUR_LATEST_RELEASE=$releases" >> $GITHUB_ENV
+          ourLatestRelease=$(gh release list -R ${{ github.repository }} -L 1 --json tagName -q '.[0].tagName')
+          echo "Our latest release: $ourLatestRelease"
+          echo "OUR_LATEST_RELEASE=$ourLatestRelease" >> $GITHUB_ENV
 
       - name: Compare releases
         id: compare
