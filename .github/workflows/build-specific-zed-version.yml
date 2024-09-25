@@ -42,7 +42,7 @@ jobs:
         run: |
           echo "Ready to build ${{ github.event.inputs.zed_version }}"
 
-      - name: Install rust nightly
+      - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
