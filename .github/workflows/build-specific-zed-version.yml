@@ -45,7 +45,7 @@ jobs:
       - name: Install rust nightly
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: stable
           override: true
           target: wasm32-wasi
 
