@@ -7,9 +7,11 @@ builds:
 
 # Build Types
 - ZedInstaller-{version}.exe
+
 This is the installer. You can install Zed to any location by following the installation wizard.
 
 - zed-{version}.zip
+
 This is the standalone executable of Zed. You can run the extracted executable directly after unzipping.
 
 ## Is it safe?
