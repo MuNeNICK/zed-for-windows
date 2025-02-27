@@ -68,8 +68,18 @@ jobs:
           fetch-depth: 1
 
       - name: Set up for build
+        shell: powershell
         run: |
-          echo "Ready to build ${{ needs.check.outputs.latest_tag }}"
+          Write-Output "Ready to build ${{ needs.check.outputs.latest_tag }}"
+          if (Test-Path ".cargo/config.toml") {
+            $configString = "[profile.release]`n debug = false`n lto = `"fat`"`n opt-level = 3`n codegen-units = 1`n panic = `"abort`"`n strip = true"
+            Write-Output "Configuration string: $configString"
+            $configString | Add-Content .cargo/config.toml
+            Write-Output "Successfully appended build parameters to .cargo/config.toml"
+            Get-Content .cargo/config.toml
+          } else {
+            Write-Output "Error: .cargo/config.toml file does not exist"
+          }
 
       - name: Install rust
         uses: actions-rs/toolchain@v1
