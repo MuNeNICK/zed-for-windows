@@ -1,3 +1,11 @@
+# ⚠️ This repository has been archived(2025/10/16).
+Since it seems that the Windows version of Zed has finally been released, this repository will be archived.
+
+The official installer can be found here:
+https://zed.dev/download
+
+If you still need to build it manually on Windows, please fork this repository.
+
 # Unofficial release builds of Zed for Windows
 
 Only release versions are included, and pre-release versions may not be included.
